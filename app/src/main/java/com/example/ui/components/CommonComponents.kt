@@ -115,7 +115,7 @@ fun NileTopHeader(
                                     .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
-                                    text = "EGYPT",
+                                    text = "مصر",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = NileGold
@@ -123,7 +123,7 @@ fun NileTopHeader(
                             }
                         }
                         Text(
-                            text = "Meeza & CBE Compliant",
+                            text = "معتمد من البنك المركزي وميزة",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -235,7 +235,7 @@ fun NileTopHeader(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = "Admin",
+                                text = "الإدارة",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = NileCyan
@@ -300,9 +300,9 @@ fun NileTopHeader(
                             }
                             Text(
                                 text = if (activeCompany.isActive) {
-                                    "${activeCompany.grantedPermissions.size} permissions active • Max ${String.format(Locale.US, "%,.0f", activeCompany.maxSingleTxLimitEGP)} EGP"
+                                    "${activeCompany.grantedPermissions.size} صلاحية نشطة • الحد الأقصى ${String.format(Locale.US, "%,.0f", activeCompany.maxSingleTxLimitEGP)} ج.م"
                                 } else {
-                                    "ACCESS REVOKED BY OWNER"
+                                    "تم إلغاء الصلاحية من الإدارة"
                                 },
                                 fontSize = 11.sp,
                                 color = if (activeCompany.isActive) MaterialTheme.colorScheme.onSurfaceVariant else NileError
@@ -311,7 +311,7 @@ fun NileTopHeader(
                     }
 
                     Text(
-                        text = "Switch Persona ▸",
+                        text = "تبديل الصلاحية ▸",
                         fontSize = 11.sp,
                         color = NileCyan,
                         fontWeight = FontWeight.Medium
@@ -402,7 +402,7 @@ fun TransactionItemRow(
                     )
                     if (tx.status == TransactionStatus.BLOCKED_ACCESS_CONTROL) {
                         Text(
-                            text = "Blocked by Access Policy",
+                            text = "محظور بسياسة الأمان",
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold,
                             color = NileError
@@ -413,7 +413,7 @@ fun TransactionItemRow(
 
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = "${if (tx.status == TransactionStatus.SUCCESS) "-" else ""}${String.format(Locale.US, "%,.2f", tx.amountEGP)} EGP",
+                    text = "${if (tx.status == TransactionStatus.SUCCESS) "-" else ""}${String.format(Locale.US, "%,.2f", tx.amountEGP)} ج.م",
                     fontWeight = FontWeight.Bold,
                     fontSize = 15.sp,
                     color = when (tx.status) {

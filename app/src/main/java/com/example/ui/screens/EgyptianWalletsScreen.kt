@@ -141,13 +141,13 @@ fun EgyptianWalletsScreen(
                 Spacer(modifier = Modifier.width(8.dp))
                 Column {
                     Text(
-                        text = "Egyptian Mobile Wallets",
+                        text = "المحافظ المحمول والتحويلات المصرية",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
                     Text(
-                        text = "Vodafone Cash • InstaPay IPN • Meeza Gateway",
+                        text = "فودافون كاش • إنستا باي IPN • بوابات ميزة الوطنية",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -236,13 +236,13 @@ fun EgyptianWalletsScreen(
                         Spacer(modifier = Modifier.width(12.dp))
                         Column {
                             Text(
-                                text = "Wallet Access Revoked for Testing Group",
+                                text = "وصول المحافظ ملغى بسياسة التحكم",
                                 fontWeight = FontWeight.Bold,
                                 color = NileError,
                                 fontSize = 14.sp
                             )
                             Text(
-                                text = "Permission 'EGYPTIAN_MOBILE_WALLETS' is currently disabled for '${activeCompany.companyName}'.",
+                                text = "الصلاحية 'EGYPTIAN_MOBILE_WALLETS' غير مفعلة للجه الحالية '${activeCompany.companyName}'.",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
@@ -260,11 +260,11 @@ fun EgyptianWalletsScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "LINKED EGYPTIAN WALLET ACCOUNTS",
-                    fontSize = 11.sp,
+                    text = "المحافظ والحسابات المصرية المربوطة",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = NileCyan,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.5.sp
                 )
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (wallets.isNotEmpty()) {
@@ -285,7 +285,7 @@ fun EgyptianWalletsScreen(
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("open_link_wallet_button")
                     ) {
-                        Text(text = "+ Link Wallet", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "+ ربط محفظة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -315,14 +315,14 @@ fun EgyptianWalletsScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "No Egyptian Mobile Wallets Linked",
+                            text = "لا توجد محافظ إلكترونية مربوطة",
                             fontWeight = FontWeight.Bold,
                             fontSize = 14.sp,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "Tap here to link your Vodafone Cash, InstaPay (Meeza IPN), Orange, Etisalat, or WE Pay account.",
+                            text = "اضغط هنا لربط حساب فودافون كاش، إنستا باي (Meeza IPN)، أورانج، اتصالات، أو WE Pay.",
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = androidx.compose.ui.text.style.TextAlign.Center

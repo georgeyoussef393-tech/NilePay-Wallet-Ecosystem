@@ -45,6 +45,7 @@ object NilePayStorageManager {
 
     private val storageScope = CoroutineScope(Dispatchers.IO)
     private var appContext: Context? = null
+    private var roomRepository: com.example.storage.db.NilePayRoomRepository? = null
 
     private val _stats = MutableStateFlow(StorageStatistics())
     val stats: StateFlow<StorageStatistics> = _stats.asStateFlow()
@@ -52,11 +53,15 @@ object NilePayStorageManager {
     @Volatile
     private var isInitialized = false
 
+    fun getRoomRepository(): com.example.storage.db.NilePayRoomRepository? = roomRepository
+
     fun init(context: Context) {
         if (isInitialized && appContext != null) return
         appContext = context.applicationContext
+        val db = com.example.storage.db.NilePayDatabase.getDatabase(context.applicationContext)
+        roomRepository = com.example.storage.db.NilePayRoomRepository(db)
         isInitialized = true
-        Log.i(TAG, "NilePay Storage initialized at: ${context.filesDir.absolutePath}")
+        Log.i(TAG, "NilePay Storage & Encrypted Room Database initialized at: ${context.filesDir.absolutePath}")
     }
 
     private fun getFile(fileName: String): File? {
@@ -71,6 +76,7 @@ object NilePayStorageManager {
     fun saveCards(cards: List<CardToken>) {
         storageScope.launch {
             try {
+                roomRepository?.saveAllCards(cards)
                 val file = getFile(FILE_CARDS) ?: return@launch
                 val jsonArray = JSONArray()
                 cards.forEach { card ->
@@ -150,6 +156,7 @@ object NilePayStorageManager {
     fun saveWallets(wallets: List<EgyptianWalletAccount>) {
         storageScope.launch {
             try {
+                roomRepository?.saveAllWallets(wallets)
                 val file = getFile(FILE_WALLETS) ?: return@launch
                 val jsonArray = JSONArray()
                 wallets.forEach { w ->
@@ -215,6 +222,7 @@ object NilePayStorageManager {
     fun saveTransactions(transactions: List<TransactionRecord>) {
         storageScope.launch {
             try {
+                roomRepository?.saveAllTransactions(transactions)
                 val file = getFile(FILE_TRANSACTIONS) ?: return@launch
                 val jsonArray = JSONArray()
                 // Keep up to 200 most recent transactions for fast persistence

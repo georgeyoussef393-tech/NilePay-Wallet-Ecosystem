@@ -232,11 +232,11 @@ fun HomeScreen(
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "AGGREGATED EGYPTIAN BALANCE",
-                                        fontSize = 11.sp,
+                                        text = "إجمالي الرصيد المتاح",
+                                        fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NileCyan,
-                                        letterSpacing = 1.sp
+                                        letterSpacing = 0.5.sp
                                     )
                                 }
                                 Box(
@@ -246,7 +246,7 @@ fun HomeScreen(
                                         .padding(horizontal = 8.dp, vertical = 2.dp)
                                 ) {
                                     Text(
-                                        text = "CBE IPN",
+                                        text = "الشبكة القومية IPN",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NileGold
@@ -257,7 +257,7 @@ fun HomeScreen(
                             Spacer(modifier = Modifier.height(10.dp))
 
                             Text(
-                                text = "${String.format(Locale.US, "%,.2f", totalWalletBalance)} EGP",
+                                text = "${String.format(Locale.US, "%,.2f", totalWalletBalance)} ج.م",
                                 fontSize = 32.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White
@@ -270,12 +270,12 @@ fun HomeScreen(
                                 horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 Column {
-                                    Text(text = "Cards Registered", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "${cards.size} Cards (Visa / MC / Meeza)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    Text(text = "البطاقات المسجلة", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = "${cards.size} بطاقات (فيزا / ماستركارد / ميزة)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
                                 }
                                 Column {
-                                    Text(text = "Egyptian Wallets", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "${wallets.count { it.isLinked }} Active (Vodafone, InstaPay)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                    Text(text = "المحافظ المحمول", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = "${wallets.count { it.isLinked }} نشطة (فودافون كاش، إنستا باي)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
                                 }
                             }
                         }
@@ -288,11 +288,11 @@ fun HomeScreen(
         item {
             Column(modifier = Modifier.padding(horizontal = 16.dp)) {
                 Text(
-                    text = "CORE PAYMENT CAPABILITIES",
-                    fontSize = 11.sp,
+                    text = "خدمات الدفع الرئيسية",
+                    fontSize = 12.sp,
                     fontWeight = FontWeight.Bold,
                     color = NileCyan,
-                    letterSpacing = 1.sp
+                    letterSpacing = 0.5.sp
                 )
                 Spacer(modifier = Modifier.height(10.dp))
 
@@ -302,8 +302,8 @@ fun HomeScreen(
                 ) {
                     QuickActionCard(
                         modifier = Modifier.weight(1f),
-                        title = "NFC Tap & Pay",
-                        subtitle = "Visa / Mastercard POS",
+                        title = "الدفع اللاتلامسي NFC",
+                        subtitle = "على ماكينات POS",
                         icon = Icons.Default.Nfc,
                         accentColor = NileCyan,
                         testTag = "quick_action_nfc",
@@ -311,8 +311,8 @@ fun HomeScreen(
                     )
                     QuickActionCard(
                         modifier = Modifier.weight(1f),
-                        title = "Vodafone Cash",
-                        subtitle = "Transfer & Cash-Out",
+                        title = "فودافون كاش",
+                        subtitle = "تحويل وسحب ATM",
                         icon = Icons.Default.PhoneAndroid,
                         accentColor = VodafoneRed,
                         testTag = "quick_action_vodafone",
@@ -328,8 +328,8 @@ fun HomeScreen(
                 ) {
                     QuickActionCard(
                         modifier = Modifier.weight(1f),
-                        title = "InstaPay IPN",
-                        subtitle = "Instant CBE Transfer",
+                        title = "إنستا باي IPN",
+                        subtitle = "تحويل بنكي لحظي",
                         icon = Icons.Default.Send,
                         accentColor = InstaPayPurple,
                         testTag = "quick_action_instapay",
@@ -337,8 +337,8 @@ fun HomeScreen(
                     )
                     QuickActionCard(
                         modifier = Modifier.weight(1f),
-                        title = "Admin Console",
-                        subtitle = "Dynamic Access Control",
+                        title = "لوحة التحكم بالأمان",
+                        subtitle = "إدارة الصلاحيات والحدود",
                         icon = Icons.Default.AdminPanelSettings,
                         accentColor = NileGold,
                         testTag = "quick_action_admin",
@@ -522,11 +522,11 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "TOKENIZED PAYMENT CARDS",
-                        fontSize = 11.sp,
+                        text = "البطاقات المشفرة",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = NileCyan,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.5.sp
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TextButton(
@@ -538,7 +538,7 @@ fun HomeScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Nfc, contentDescription = null, tint = NileCyan, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Scan NFC", color = NileCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "مسح NFC", color = NileCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         TextButton(
                             onClick = { showAddCardDialog = true },
@@ -546,7 +546,7 @@ fun HomeScreen(
                         ) {
                             Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = NileCyan, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
-                            Text(text = "Manual", color = NileCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            Text(text = "إضافة كارت", color = NileCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                         }
                         if (cards.isNotEmpty() || wallets.isNotEmpty()) {
                             TextButton(
@@ -583,14 +583,14 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "No Payment Cards Registered",
+                                text = "لا توجد بطاقات مسجلة بعد",
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 14.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                text = "Tap your physical Visa / Mastercard against the phone to scan via NFC, or enter details manually.",
+                                text = "قَرّب كارت البنك البلاستيكي الخاص بك من خلف الهاتف لمسحه بالـ NFC أو أدخل بياناته يدوياً.",
                                 fontSize = 12.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
@@ -608,7 +608,7 @@ fun HomeScreen(
                                 ) {
                                     Icon(imageVector = Icons.Default.Nfc, contentDescription = null, modifier = Modifier.size(16.dp))
                                     Spacer(modifier = Modifier.width(6.dp))
-                                    Text(text = "Scan Card (NFC)", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                                    Text(text = "مسح كارت بالـ NFC", fontWeight = FontWeight.Bold, fontSize = 12.sp)
                                 }
                                 Button(
                                     onClick = { showAddCardDialog = true },
@@ -617,7 +617,7 @@ fun HomeScreen(
                                     border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF)),
                                     modifier = Modifier.testTag("empty_banner_manual")
                                 ) {
-                                    Text(text = "Manual Entry", fontSize = 12.sp)
+                                    Text(text = "إدخال يدوي", fontSize = 12.sp)
                                 }
                             }
                         }
@@ -649,14 +649,14 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "RECENT TRANSACTIONS & AUDIT",
-                        fontSize = 11.sp,
+                        text = "آخر المعاملات والتحويلات",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = NileCyan,
-                        letterSpacing = 1.sp
+                        letterSpacing = 0.5.sp
                     )
                     Text(
-                        text = "${transactions.size} records",
+                        text = "${transactions.size} معاملة",
                         fontSize = 11.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -680,14 +680,14 @@ fun HomeScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Text(
-                                text = "No Transactions Recorded Yet",
+                                text = "لا توجد معاملات مسجلة بعد",
                                 fontWeight = FontWeight.SemiBold,
                                 fontSize = 13.sp,
                                 color = MaterialTheme.colorScheme.onSurface
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
-                                text = "Perform a contactless NFC payment or mobile wallet transfer to view real-time audit ledger.",
+                                text = "قم بإجراء عملية دفع لاتلامسي عبر الـ NFC أو تحويل كاش لعرض السجل المباشر.",
                                 fontSize = 11.sp,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 textAlign = androidx.compose.ui.text.style.TextAlign.Center
