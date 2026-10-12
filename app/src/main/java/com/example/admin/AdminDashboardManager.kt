@@ -3,8 +3,11 @@ package com.example.admin
 import com.example.model.FeaturePermission
 import com.example.model.TransactionRecord
 import com.example.model.TransactionStatus
+import com.example.model.TransactionType
 import com.example.security.AccessControlManager
 import com.example.wallets.EgyptianWalletEngine
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 
 data class SystemDashboardMetrics(
@@ -13,18 +16,43 @@ data class SystemDashboardMetrics(
     val blockedByPolicyCount: Int,
     val activeTestingCompaniesCount: Int,
     val revokedCompaniesCount: Int,
+    val activeUserAccountsCount: Int,
+    val suspendedUserAccountsCount: Int,
+    val flaggedRiskAccountsCount: Int,
     val cbeMeezaStatus: String,
     val vodafoneSdfStatus: String,
-    val hceEmvVaultStatus: String
+    val hceEmvVaultStatus: String,
+    val isFirestoreLive: Boolean
 )
 
 object AdminDashboardManager {
 
-    val metricsFlow = EgyptianWalletEngine.recentTransactions.map { txList ->
+    init {
+        // Start Firestore listener
+        AdminFirestoreRepository.startRealtimeMonitoring()
+    }
+
+    val mergedTransactionsFlow: Flow<List<TransactionRecord>> = combine(
+        EgyptianWalletEngine.recentTransactions,
+        AdminFirestoreRepository.realtimeTransactions
+    ) { localTx, firestoreTx ->
+        val combined = (firestoreTx + localTx).distinctBy { it.id }
+        combined.sortedByDescending { it.timestamp }
+    }
+
+    val metricsFlow: Flow<SystemDashboardMetrics> = combine(
+        mergedTransactionsFlow,
+        AdminFirestoreRepository.realtimeUserAccounts,
+        AdminFirestoreRepository.isFirestoreConnected
+    ) { txList, userAccounts, isConnected ->
         val total = txList.filter { it.status == TransactionStatus.SUCCESS }.sumOf { it.amountEGP }
         val successCount = txList.count { it.status == TransactionStatus.SUCCESS }
         val blockedCount = txList.count { it.status == TransactionStatus.BLOCKED_ACCESS_CONTROL }
         val companies = AccessControlManager.companies.value
+
+        val activeUsers = userAccounts.count { it.status == "ACTIVE" }
+        val suspendedUsers = userAccounts.count { it.status == "SUSPENDED" }
+        val flaggedUsers = userAccounts.count { it.status == "FLAGGED_RISK" }
 
         SystemDashboardMetrics(
             totalVolumeEGP = total,
@@ -32,10 +60,45 @@ object AdminDashboardManager {
             blockedByPolicyCount = blockedCount,
             activeTestingCompaniesCount = companies.count { it.isActive },
             revokedCompaniesCount = companies.count { !it.isActive },
-            cbeMeezaStatus = "ONLINE (Latency 18ms)",
+            activeUserAccountsCount = activeUsers,
+            suspendedUserAccountsCount = suspendedUsers,
+            flaggedRiskAccountsCount = flaggedUsers,
+            cbeMeezaStatus = "ONLINE (CBE IPN 14ms)",
             vodafoneSdfStatus = "OPERATIONAL (SDF v2.4)",
-            hceEmvVaultStatus = "PCI-DSS Level 1 Encrypted"
+            hceEmvVaultStatus = "PCI-DSS Level 1 Encrypted",
+            isFirestoreLive = isConnected
         )
+    }
+
+    /**
+     * Mint a real-time test transaction directly to Firestore
+     */
+    fun mintTestTransactionToFirestore(
+        title: String,
+        amountEGP: Double,
+        type: TransactionType = TransactionType.NFC_TAP_PAY,
+        status: TransactionStatus = TransactionStatus.SUCCESS
+    ) {
+        val txId = "tx-cbe-${System.currentTimeMillis() % 100000}"
+        val record = TransactionRecord(
+            id = txId,
+            title = title,
+            type = type,
+            amountEGP = amountEGP,
+            recipient = "CBE Clearing Merchant #4402",
+            source = "Vodafone Cash (*9#)",
+            timestamp = System.currentTimeMillis(),
+            status = status,
+            cbeReference = "CBE-IPN-2026-${(100000..999999).random()}",
+            authMethod = "Biometric + NFC EMV ARQC",
+            terminalLocation = "Cairo POS Terminal #891",
+            apduCode = "00A40400 9000 (SW1SW2)",
+            notes = "Real-Time Firestore Audit Ingested"
+        )
+        // Record in local wallet engine
+        EgyptianWalletEngine.recordTransaction(record)
+        // Push to Firestore
+        AdminFirestoreRepository.pushTransactionToFirestore(record)
     }
 
     /**

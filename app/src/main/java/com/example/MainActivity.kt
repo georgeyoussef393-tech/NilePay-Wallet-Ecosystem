@@ -20,6 +20,7 @@ import com.example.cards.CardRepository
 import com.example.nfc.NfcScanManager
 import com.example.nfc.NfcService
 import com.example.security.AccessControlManager
+import com.example.security.AuthManager
 import com.example.security.BiometricAuthManager
 import com.example.storage.CloudSyncManager
 import com.example.storage.NilePayStorageManager
@@ -27,15 +28,23 @@ import com.example.ui.components.BiometricLockScreen
 import com.example.ui.screens.AdminDashboardScreen
 import com.example.ui.screens.EgyptianWalletsScreen
 import com.example.ui.screens.HomeScreen
+import com.example.ui.screens.LinkWalletScreen
+import com.example.ui.screens.LoginScreen
 import com.example.ui.screens.NfcPaymentScreen
+import com.example.ui.screens.PrivacyPolicyScreen
+import com.example.ui.screens.TransactionsScreen
 import com.example.ui.theme.MyApplicationTheme
 import com.example.wallets.EgyptianWalletEngine
 
 enum class Screen {
+    LOGIN,
     HOME,
     NFC_PAYMENT,
     EGYPTIAN_WALLETS,
-    ADMIN_DASHBOARD
+    LINK_WALLET,
+    ADMIN_DASHBOARD,
+    TRANSACTIONS,
+    PRIVACY_POLICY
 }
 
 class MainActivity : FragmentActivity() {
@@ -45,9 +54,10 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Initialize persistent local storage and cloud sync systems
+        // Initialize persistent local storage, auth session, and cloud sync systems
         NilePayStorageManager.init(this)
         CloudSyncManager.init(this)
+        AuthManager.init(this)
         CardRepository.loadFromStorageOrSeed()
         EgyptianWalletEngine.loadFromStorageOrSeed()
         AccessControlManager.loadFromStorageOrSeed()
@@ -67,7 +77,7 @@ class MainActivity : FragmentActivity() {
         nfcService.checkHardwareSupport()
         nfcService.enableReaderMode(this) { tag ->
             runOnUiThread {
-                NfcScanManager.onTagDiscovered(tag)
+                NfcScanManager.onTagDiscovered(tag, this)
             }
         }
     }
@@ -81,17 +91,33 @@ class MainActivity : FragmentActivity() {
         super.onNewIntent(intent)
         val tag = nfcService.extractTagFromIntent(intent)
         if (tag != null) {
-            NfcScanManager.onTagDiscovered(tag)
+            NfcScanManager.onTagDiscovered(tag, this)
         }
     }
 }
 
 @Composable
 fun NilePayApp() {
-    var currentScreen by remember { mutableStateOf(Screen.HOME) }
+    val isLoggedIn by AuthManager.isLoggedIn.collectAsState()
+    var currentScreen by remember { mutableStateOf(if (isLoggedIn) Screen.HOME else Screen.LOGIN) }
     val isWalletLocked by BiometricAuthManager.isWalletLocked.collectAsState()
 
-    if (isWalletLocked) {
+    if (currentScreen == Screen.PRIVACY_POLICY) {
+        PrivacyPolicyScreen(
+            onNavigateBack = {
+                currentScreen = if (isLoggedIn) Screen.HOME else Screen.LOGIN
+            }
+        )
+    } else if (!isLoggedIn || currentScreen == Screen.LOGIN) {
+        LoginScreen(
+            onLoginSuccess = {
+                currentScreen = Screen.HOME
+            },
+            onNavigateToPrivacy = {
+                currentScreen = Screen.PRIVACY_POLICY
+            }
+        )
+    } else if (isWalletLocked) {
         BiometricLockScreen(
             onUnlocked = {
                 // Wallet is unlocked
@@ -109,7 +135,10 @@ fun NilePayApp() {
                         HomeScreen(
                             onNavigateToNfc = { currentScreen = Screen.NFC_PAYMENT },
                             onNavigateToWallets = { currentScreen = Screen.EGYPTIAN_WALLETS },
-                            onNavigateToAdmin = { currentScreen = Screen.ADMIN_DASHBOARD }
+                            onNavigateToAdmin = { currentScreen = Screen.ADMIN_DASHBOARD },
+                            onNavigateToTransactions = { currentScreen = Screen.TRANSACTIONS },
+                            onNavigateToPrivacy = { currentScreen = Screen.PRIVACY_POLICY },
+                            onNavigateToLogin = { currentScreen = Screen.LOGIN }
                         )
                     }
 
@@ -123,7 +152,16 @@ fun NilePayApp() {
                     Screen.EGYPTIAN_WALLETS -> {
                         BackHandler { currentScreen = Screen.HOME }
                         EgyptianWalletsScreen(
-                            onNavigateBack = { currentScreen = Screen.HOME }
+                            onNavigateBack = { currentScreen = Screen.HOME },
+                            onNavigateToLinkWallet = { currentScreen = Screen.LINK_WALLET }
+                        )
+                    }
+
+                    Screen.LINK_WALLET -> {
+                        BackHandler { currentScreen = Screen.EGYPTIAN_WALLETS }
+                        LinkWalletScreen(
+                            onNavigateBack = { currentScreen = Screen.EGYPTIAN_WALLETS },
+                            onWalletLinked = { currentScreen = Screen.EGYPTIAN_WALLETS }
                         )
                     }
 
@@ -131,6 +169,27 @@ fun NilePayApp() {
                         BackHandler { currentScreen = Screen.HOME }
                         AdminDashboardScreen(
                             onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
+
+                    Screen.TRANSACTIONS -> {
+                        BackHandler { currentScreen = Screen.HOME }
+                        TransactionsScreen(
+                            onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
+
+                    Screen.PRIVACY_POLICY -> {
+                        BackHandler { currentScreen = Screen.HOME }
+                        PrivacyPolicyScreen(
+                            onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
+
+                    Screen.LOGIN -> {
+                        LoginScreen(
+                            onLoginSuccess = { currentScreen = Screen.HOME },
+                            onNavigateToPrivacy = { currentScreen = Screen.PRIVACY_POLICY }
                         )
                     }
                 }

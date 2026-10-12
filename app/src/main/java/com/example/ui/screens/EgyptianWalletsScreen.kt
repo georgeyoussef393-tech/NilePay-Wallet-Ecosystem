@@ -77,7 +77,8 @@ import java.util.Locale
 
 @Composable
 fun EgyptianWalletsScreen(
-    onNavigateBack: () -> Unit
+    onNavigateBack: () -> Unit,
+    onNavigateToLinkWallet: () -> Unit = {}
 ) {
     val wallets by EgyptianWalletEngine.wallets.collectAsState()
     val activeCompany by AccessControlManager.activeCompany.collectAsState()
@@ -280,12 +281,12 @@ fun EgyptianWalletsScreen(
                         Spacer(modifier = Modifier.width(4.dp))
                     }
                     Button(
-                        onClick = { showLinkWalletDialog = true },
+                        onClick = { onNavigateToLinkWallet() },
                         colors = ButtonDefaults.buttonColors(containerColor = NileCyan, contentColor = Color.Black),
                         shape = RoundedCornerShape(8.dp),
                         modifier = Modifier.testTag("open_link_wallet_button")
                     ) {
-                        Text(text = "+ ربط محفظة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        Text(text = "+ ربط محفظة عبر API", fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }

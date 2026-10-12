@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,13 +18,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
-import android.widget.Toast
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Atm
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.CreditCard
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -64,22 +66,27 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
 import com.example.cards.CardRepository
 import com.example.model.CardToken
 import com.example.model.CardType
 import com.example.model.FeaturePermission
 import com.example.model.TransactionRecord
+import com.example.model.WalletProvider
 import com.example.nfc.EmvScannedCard
 import com.example.nfc.NfcHardwareStatus
 import com.example.nfc.NfcScanManager
 import com.example.nfc.NfcService
 import com.example.security.AccessControlManager
+import com.example.security.AuthManager
+import com.example.security.BiometricAuthManager
 import com.example.storage.CloudSyncManager
 import com.example.storage.NilePayStorageManager
 import com.example.wallets.EgyptianWalletEngine
 import com.example.ui.components.CloudSyncDialog
 import com.example.ui.components.NfcCardScanDialog
 import com.example.ui.components.NileTopHeader
+import com.example.ui.components.PrivacyPolicyDialog
 import com.example.ui.components.SecurityVaultDialog
 import com.example.ui.components.TransactionItemRow
 import com.example.ui.theme.InstaPayPurple
@@ -93,11 +100,25 @@ import com.example.ui.theme.NileSuccess
 import com.example.ui.theme.VodafoneRed
 import java.util.Locale
 
+enum class DashboardPaymentMethod(
+    val titleAr: String,
+    val icon: ImageVector,
+    val color: Color
+) {
+    NFC_CARD("بطاقات البنك (NFC)", Icons.Default.CreditCard, NileCyan),
+    VODAFONE_CASH("فودافون كاش", Icons.Default.PhoneAndroid, VodafoneRed),
+    INSTAPAY("إنستا باي IPN", Icons.Default.Send, InstaPayPurple),
+    ORANGE_CASH("أورانج كاش", Icons.Default.PhoneAndroid, NileGold)
+}
+
 @Composable
 fun HomeScreen(
     onNavigateToNfc: () -> Unit,
     onNavigateToWallets: () -> Unit,
-    onNavigateToAdmin: () -> Unit
+    onNavigateToAdmin: () -> Unit,
+    onNavigateToTransactions: () -> Unit = {},
+    onNavigateToPrivacy: () -> Unit = {},
+    onNavigateToLogin: () -> Unit = {}
 ) {
     val cards by CardRepository.cards.collectAsState()
     val defaultCard by CardRepository.defaultNfcCard.collectAsState()
@@ -105,6 +126,7 @@ fun HomeScreen(
     val transactions by EgyptianWalletEngine.recentTransactions.collectAsState()
     val activeCompany by AccessControlManager.activeCompany.collectAsState()
     val companies by AccessControlManager.companies.collectAsState()
+    val currentUser by AuthManager.currentUser.collectAsState()
 
     val scannedCard by NfcScanManager.scannedCard.collectAsState()
     val isScanning by NfcScanManager.isScanning.collectAsState()
@@ -116,15 +138,33 @@ fun HomeScreen(
     var showNfcScanDialog by remember { mutableStateOf(false) }
     var showCloudSyncDialog by remember { mutableStateOf(false) }
     var showSecurityVaultDialog by remember { mutableStateOf(false) }
+    var showPrivacyDialog by remember { mutableStateOf(false) }
     var showClearDataDialog by remember { mutableStateOf(false) }
     var selectedTxDetail by remember { mutableStateOf<TransactionRecord?>(null) }
 
+    // Active Dashboard Payment Method
+    var activeMethod by remember { mutableStateOf(DashboardPaymentMethod.NFC_CARD) }
+    var selectedDashboardCardId by remember { mutableStateOf(defaultCard?.id ?: cards.firstOrNull()?.id.orEmpty()) }
+    val activeCard = cards.find { it.id == selectedDashboardCardId } ?: defaultCard ?: cards.firstOrNull()
+
+    val vodafoneWallet = wallets.find { it.provider == WalletProvider.VODAFONE_CASH }
+    val instapayWallet = wallets.find { it.provider == WalletProvider.INSTAPAY_MEEZA }
+    val orangeWallet = wallets.find { it.provider == WalletProvider.ORANGE_MONEY }
+
     val context = LocalContext.current
+    val activity = context as? FragmentActivity
     val nfcService = remember { NfcService.getInstance(context) }
     val nfcHardwareStatus by nfcService.hardwareStatus.collectAsState()
 
     // Total aggregated balance across cards & Egyptian mobile wallets
     val totalWalletBalance = wallets.filter { it.isLinked }.sumOf { it.balanceEGP }
+
+    if (showPrivacyDialog) {
+        PrivacyPolicyDialog(
+            onDismiss = { showPrivacyDialog = false },
+            onOpenFullScreen = onNavigateToPrivacy
+        )
+    }
 
     LazyColumn(
         modifier = Modifier
@@ -140,6 +180,106 @@ fun HomeScreen(
                 onOpenCloudSync = { showCloudSyncDialog = true },
                 onOpenSecurityCenter = { showSecurityVaultDialog = true }
             )
+        }
+
+        // Account Session & Privacy Quick Info Bar
+        item {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 6.dp),
+                shape = RoundedCornerShape(14.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                border = androidx.compose.foundation.BorderStroke(1.dp, NileCyan.copy(alpha = 0.3f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(32.dp)
+                                .clip(CircleShape)
+                                .background(NileCyan.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = currentUser.fullName.take(1),
+                                fontWeight = FontWeight.Bold,
+                                color = NileCyan,
+                                fontSize = 14.sp
+                            )
+                        }
+
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = currentUser.fullName,
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(NileSuccess.copy(alpha = 0.2f))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = "CBE موثق",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = NileSuccess
+                                    )
+                                }
+                            }
+                            Text(
+                                text = "حفظ سحابي آمن مفعّل (${currentUser.emailOrPhone})",
+                                fontSize = 10.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        TextButton(
+                            onClick = { showPrivacyDialog = true },
+                            modifier = Modifier.testTag("privacy_policy_home_chip")
+                        ) {
+                            Text(
+                                text = "الخصوصية والسياسة",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NileCyan
+                            )
+                        }
+
+                        TextButton(
+                            onClick = {
+                                AuthManager.logout()
+                                onNavigateToLogin()
+                            },
+                            modifier = Modifier.testTag("logout_home_button")
+                        ) {
+                            Text(
+                                text = "خروج",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NileError
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         // NFC Disabled Prompt Banner
@@ -194,16 +334,16 @@ fun HomeScreen(
             }
         }
 
-        // Hero Balance Card
+        // Interactive Payment Dashboard UI
         item {
             Column(modifier = Modifier.padding(16.dp)) {
                 Surface(
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("hero_balance_card"),
-                    shape = RoundedCornerShape(20.dp),
+                    shape = RoundedCornerShape(22.dp),
                     color = MaterialTheme.colorScheme.surfaceVariant,
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x3300C2CB))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, activeMethod.color.copy(alpha = 0.5f))
                 ) {
                     Box(
                         modifier = Modifier
@@ -211,13 +351,14 @@ fun HomeScreen(
                                 Brush.linearGradient(
                                     colors = listOf(
                                         Color(0xFF0F2B48),
-                                        Color(0xFF071424)
+                                        Color(0xFF06111E)
                                     )
                                 )
                             )
-                            .padding(20.dp)
+                            .padding(18.dp)
                     ) {
                         Column {
+                            // Header Row: Total Aggregated Balance + CBE Badge
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -227,55 +368,364 @@ fun HomeScreen(
                                     Icon(
                                         imageVector = Icons.Default.Shield,
                                         contentDescription = null,
-                                        tint = NileCyan,
-                                        modifier = Modifier.size(16.dp)
+                                        tint = activeMethod.color,
+                                        modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
-                                        text = "إجمالي الرصيد المتاح",
+                                        text = "إجمالي المحفظة والرصيد المتاح",
                                         fontSize = 12.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = NileCyan,
+                                        color = activeMethod.color,
                                         letterSpacing = 0.5.sp
                                     )
                                 }
-                                Box(
-                                    modifier = Modifier
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .background(NileGold.copy(alpha = 0.2f))
-                                        .padding(horizontal = 8.dp, vertical = 2.dp)
+                                Surface(
+                                    shape = RoundedCornerShape(6.dp),
+                                    color = NileGold.copy(alpha = 0.2f)
                                 ) {
                                     Text(
-                                        text = "الشبكة القومية IPN",
+                                        text = "مرخص CBE • IPN",
                                         fontSize = 10.sp,
                                         fontWeight = FontWeight.Bold,
-                                        color = NileGold
+                                        color = NileGold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                                     )
                                 }
                             }
 
-                            Spacer(modifier = Modifier.height(10.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             Text(
                                 text = "${String.format(Locale.US, "%,.2f", totalWalletBalance)} ج.م",
-                                fontSize = 32.sp,
+                                fontSize = 30.sp,
                                 fontWeight = FontWeight.Black,
                                 color = Color.White
                             )
 
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                            // Payment Method Switcher Tabs (NFC Cards, Vodafone Cash, InstaPay, Orange Cash)
+                            Text(
+                                text = "اختر طريقة الدفع الفعالة (Switch Payment Method):",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(8.dp))
+
+                            LazyRow(
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                Column {
-                                    Text(text = "البطاقات المسجلة", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "${cards.size} بطاقات (فيزا / ماستركارد / ميزة)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                                items(DashboardPaymentMethod.values()) { method ->
+                                    val isSelected = activeMethod == method
+                                    Surface(
+                                        modifier = Modifier
+                                            .clickable { activeMethod = method }
+                                            .testTag("select_method_${method.name}"),
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isSelected) method.color.copy(alpha = 0.25f) else Color(0x22FFFFFF),
+                                        border = androidx.compose.foundation.BorderStroke(
+                                            width = if (isSelected) 1.5.dp else 1.dp,
+                                            color = if (isSelected) method.color else Color(0x33FFFFFF)
+                                        )
+                                    ) {
+                                        Row(
+                                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Icon(
+                                                imageVector = method.icon,
+                                                contentDescription = null,
+                                                tint = if (isSelected) method.color else Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text(
+                                                text = method.titleAr,
+                                                fontSize = 11.sp,
+                                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                                color = if (isSelected) Color.White else Color(0xCCFFFFFF)
+                                            )
+                                        }
+                                    }
                                 }
-                                Column {
-                                    Text(text = "المحافظ المحمول", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                    Text(text = "${wallets.count { it.isLinked }} نشطة (فودافون كاش، إنستا باي)", fontWeight = FontWeight.Bold, fontSize = 12.sp, color = Color.White)
+                            }
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            // Detailed Panel for Selected Payment Method
+                            when (activeMethod) {
+                                DashboardPaymentMethod.NFC_CARD -> {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "رصيد الكارت النشط:",
+                                                fontSize = 11.sp,
+                                                color = NileCyan
+                                            )
+                                            if (activeCard != null && activeCard.id == defaultCard?.id) {
+                                                Surface(
+                                                    shape = RoundedCornerShape(6.dp),
+                                                    color = NileSuccess.copy(alpha = 0.2f)
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = NileSuccess, modifier = Modifier.size(12.dp))
+                                                        Spacer(modifier = Modifier.width(4.dp))
+                                                        Text("الكارت الافتراضي للـ NFC", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = NileSuccess)
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "${String.format(Locale.US, "%,.2f", activeCard?.dailySpendLimitEGP ?: 50000.0)} ج.م (حد يومي)",
+                                            fontSize = 20.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+
+                                        Spacer(modifier = Modifier.height(8.dp))
+
+                                        // Horizontal selector for available cards
+                                        LazyRow(
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            items(cards) { card ->
+                                                val isCardChosen = card.id == (activeCard?.id ?: "")
+                                                Surface(
+                                                    modifier = Modifier
+                                                        .clickable {
+                                                            selectedDashboardCardId = card.id
+                                                        }
+                                                        .testTag("dashboard_card_${card.id}"),
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    color = if (isCardChosen) NileCyan.copy(alpha = 0.2f) else Color(0x15FFFFFF),
+                                                    border = androidx.compose.foundation.BorderStroke(
+                                                        1.dp,
+                                                        if (isCardChosen) NileCyan else Color(0x22FFFFFF)
+                                                    )
+                                                ) {
+                                                    Row(
+                                                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Icon(
+                                                            imageVector = Icons.Default.CreditCard,
+                                                            contentDescription = null,
+                                                            tint = when (card.cardType) {
+                                                                CardType.VISA -> NileCyan
+                                                                CardType.MASTERCARD -> NileGold
+                                                                CardType.MEEZA -> MeezaGreen
+                                                            },
+                                                            modifier = Modifier.size(16.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Text(
+                                                            text = "${card.issuerBank.take(12)} •••• ${card.last4}",
+                                                            fontSize = 11.sp,
+                                                            fontWeight = if (isCardChosen) FontWeight.Bold else FontWeight.Normal,
+                                                            color = Color.White
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = {
+                                                    if (activeCard != null && activity != null) {
+                                                        BiometricAuthManager.authenticate(
+                                                            activity = activity,
+                                                            title = "تفويض الدفع اللاتلامسي NFC",
+                                                            subtitle = "الكارت: ${activeCard.issuerBank} •••• ${activeCard.last4}",
+                                                            description = "بصمة الإصبع أو Face ID لتفعيل الدفع اللاتلامسي",
+                                                            onSuccess = {
+                                                                onNavigateToNfc()
+                                                            }
+                                                        )
+                                                    } else {
+                                                        onNavigateToNfc()
+                                                    }
+                                                },
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("dashboard_initiate_nfc_payment_button"),
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = NileCyan, contentColor = Color.Black)
+                                            ) {
+                                                Icon(Icons.Default.Nfc, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("دفع NFC ببصمة الإصبع", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            if (activeCard != null && activeCard.id != defaultCard?.id) {
+                                                Button(
+                                                    onClick = {
+                                                        CardRepository.setDefaultCard(activeCard.id)
+                                                    },
+                                                    shape = RoundedCornerShape(10.dp),
+                                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = Color.White)
+                                                ) {
+                                                    Text("تعيين كافتراضي", fontSize = 11.sp)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                DashboardPaymentMethod.VODAFONE_CASH -> {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "رصيد محفظة فودافون كاش:", fontSize = 11.sp, color = VodafoneRed)
+                                            Text(text = vodafoneWallet?.identifier ?: "010 9876 5432", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "${String.format(Locale.US, "%,.2f", vodafoneWallet?.balanceEGP ?: 4850.0)} ج.م",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = onNavigateToWallets,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("dashboard_vodafone_transfer_button"),
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = VodafoneRed, contentColor = Color.White)
+                                            ) {
+                                                Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("تحويل فودافون كاش", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Button(
+                                                onClick = onNavigateToWallets,
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF331010), contentColor = VodafoneRed),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, VodafoneRed)
+                                            ) {
+                                                Icon(Icons.Default.Atm, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
+                                                Text("سحب ATM", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                DashboardPaymentMethod.INSTAPAY -> {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "رصيد شبكة إنستا باي IPN:", fontSize = 11.sp, color = InstaPayPurple)
+                                            Text(text = instapayWallet?.identifier ?: "george@instapay", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "${String.format(Locale.US, "%,.2f", instapayWallet?.balanceEGP ?: 24500.0)} ج.م",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                        ) {
+                                            Button(
+                                                onClick = onNavigateToWallets,
+                                                modifier = Modifier
+                                                    .weight(1f)
+                                                    .testTag("dashboard_instapay_transfer_button"),
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = InstaPayPurple, contentColor = Color.White)
+                                            ) {
+                                                Icon(Icons.Default.Send, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("تحويل لحظي بنكي IPN", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+
+                                            Button(
+                                                onClick = onNavigateToWallets,
+                                                shape = RoundedCornerShape(10.dp),
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF201030), contentColor = InstaPayPurple),
+                                                border = androidx.compose.foundation.BorderStroke(1.dp, InstaPayPurple)
+                                            ) {
+                                                Text("طلب دفع IPN", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                }
+
+                                DashboardPaymentMethod.ORANGE_CASH -> {
+                                    Column {
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(text = "رصيد أورانج كاش:", fontSize = 11.sp, color = NileGold)
+                                            Text(text = orangeWallet?.identifier ?: "012 3456 7890", fontSize = 11.sp, color = Color.White, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        Spacer(modifier = Modifier.height(4.dp))
+
+                                        Text(
+                                            text = "${String.format(Locale.US, "%,.2f", orangeWallet?.balanceEGP ?: 1750.0)} ج.م",
+                                            fontSize = 22.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color.White
+                                        )
+
+                                        Spacer(modifier = Modifier.height(14.dp))
+
+                                        Button(
+                                            onClick = onNavigateToWallets,
+                                            modifier = Modifier.fillMaxWidth(),
+                                            shape = RoundedCornerShape(10.dp),
+                                            colors = ButtonDefaults.buttonColors(containerColor = NileGold, contentColor = Color.Black)
+                                        ) {
+                                            Text("إدارة أورانج كاش والتحويلات", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -649,19 +1099,25 @@ fun HomeScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "آخر المعاملات والتحويلات",
+                        text = "آخر المعاملات والتحويلات (Room DB)",
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = NileCyan,
                         letterSpacing = 0.5.sp
                     )
-                    Text(
-                        text = "${transactions.size} معاملة",
-                        fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    TextButton(
+                        onClick = onNavigateToTransactions,
+                        modifier = Modifier.testTag("view_all_transactions_button")
+                    ) {
+                        Text(
+                            text = "عرض الكل (${transactions.size}) ▸",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = NileCyan
+                        )
+                    }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(4.dp))
             }
         }
 
