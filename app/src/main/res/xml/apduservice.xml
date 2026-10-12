@@ -1,0 +1,16 @@
+<host-apdu-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/app_name"
+    android:requireDeviceUnlock="true">
+    <aid-group
+        android:category="payment"
+        android:description="@string/app_name">
+        <!-- Visa AID -->
+        <aid-filter android:name="A0000000031010" />
+        <!-- Mastercard AID -->
+        <aid-filter android:name="A0000000041010" />
+        <!-- Egypt Meeza National Scheme AID -->
+        <aid-filter android:name="A0000007271010" />
+        <!-- NilePay Custom Test AID -->
+        <aid-filter android:name="F0010203040506" />
+    </aid-group>
+</host-apdu-service>

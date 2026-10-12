@@ -1,0 +1,6 @@
+{
+  "name": "NilePay",
+  "description": "Comprehensive Egyptian digital wallet ecosystem with NFC contactless tap-to-pay, Egyptian mobile wallets (Vodafone Cash, InstaPay, Meeza), real-time Admin Monitoring Dashboard, and dynamic company testing access control.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
