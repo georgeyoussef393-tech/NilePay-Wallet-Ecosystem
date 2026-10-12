@@ -55,11 +55,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
+import com.example.security.BiometricAuthManager
 import com.example.security.NilePaySecurityEngine
 import com.example.security.SecurityAlertLevel
 import com.example.security.SecurityAuditEvent
@@ -78,6 +81,9 @@ import java.util.Locale
 fun SecurityVaultDialog(
     onDismiss: () -> Unit
 ) {
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+
     val isBiometrics by NilePaySecurityEngine.isBiometricEnforced.collectAsState()
     val isAntiRelay by NilePaySecurityEngine.isNfcAntiRelayActive.collectAsState()
     val isEncryption by NilePaySecurityEngine.isDataEncryptionEnforced.collectAsState()
@@ -85,6 +91,11 @@ fun SecurityVaultDialog(
     val isFraudDetect by NilePaySecurityEngine.isFraudDetectionActive.collectAsState()
     val contactlessLimit by NilePaySecurityEngine.contactlessNoPinLimitEGP.collectAsState()
     val auditLogs by NilePaySecurityEngine.auditLogs.collectAsState()
+
+    val biometricCap by BiometricAuthManager.capability.collectAsState()
+    val isLockOnLaunch by BiometricAuthManager.isLockOnLaunchEnabled.collectAsState()
+    val isBiometricCardDetails by BiometricAuthManager.isBiometricForCardDetailsRequired.collectAsState()
+    var biometricFeedback by remember { mutableStateOf<String?>(null) }
 
     var selectedTab by remember { mutableIntStateOf(0) } // 0: Controls, 1: Live Audit Logs, 2: Protocols
 
@@ -200,13 +211,39 @@ fun SecurityVaultDialog(
                             }
 
                             item {
-                                SecurityToggleCard(
-                                    title = "المصادقة بالبصمة البيومترية (Biometric / Face)",
-                                    subtitle = "طلب بصمة الإصبع أو الوجه قبل أي عملية دفع تلامسي أو استعراض للبطاقة",
-                                    icon = Icons.Default.Fingerprint,
-                                    isChecked = isBiometrics,
-                                    accentColor = NileCyan,
-                                    onToggle = { NilePaySecurityEngine.toggleBiometrics(it) }
+                                BiometricHubCard(
+                                    capability = biometricCap,
+                                    isLockOnLaunch = isLockOnLaunch,
+                                    isBiometricForNfc = isBiometrics,
+                                    isBiometricForCard = isBiometricCardDetails,
+                                    feedbackMessage = biometricFeedback,
+                                    onTestPrompt = {
+                                        biometricFeedback = null
+                                        if (activity != null) {
+                                            BiometricAuthManager.authenticate(
+                                                activity = activity,
+                                                title = "اختبار المصادقة البيومترية",
+                                                subtitle = "تحقق من بصمة الإصبع أو بصمة الوجه",
+                                                description = "فحص الاتصال بمستشعر الجهاز البيومتري و Android BiometricPrompt",
+                                                onSuccess = {
+                                                    biometricFeedback = "✅ تم تأكيد البصمة البيومترية بنجاح!"
+                                                },
+                                                onError = { err ->
+                                                    biometricFeedback = "⚠️ تنبيه: $err"
+                                                }
+                                            )
+                                        } else {
+                                            BiometricAuthManager.unlockWithBiometricSimulation("محاكاة البصمة")
+                                            biometricFeedback = "✅ تمت محاكاة مصادقة البصمة بنجاح!"
+                                        }
+                                    },
+                                    onLockNow = {
+                                        BiometricAuthManager.lockWallet()
+                                        onDismiss()
+                                    },
+                                    onToggleLockOnLaunch = { BiometricAuthManager.toggleLockOnLaunch(it) },
+                                    onToggleBiometricForNfc = { BiometricAuthManager.toggleBiometricForNfc(it) },
+                                    onToggleBiometricForCard = { BiometricAuthManager.toggleBiometricForCardDetails(it) }
                                 )
                             }
 
@@ -408,6 +445,224 @@ fun SecurityOverviewCard() {
                 )
             }
         }
+    }
+}
+
+@Composable
+fun BiometricHubCard(
+    capability: com.example.security.BiometricCapability,
+    isLockOnLaunch: Boolean,
+    isBiometricForNfc: Boolean,
+    isBiometricForCard: Boolean,
+    feedbackMessage: String?,
+    onTestPrompt: () -> Unit,
+    onLockNow: () -> Unit,
+    onToggleLockOnLaunch: (Boolean) -> Unit,
+    onToggleBiometricForNfc: (Boolean) -> Unit,
+    onToggleBiometricForCard: (Boolean) -> Unit
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = NileDarkSurface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, NileCyan.copy(alpha = 0.4f))
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(NileCyan.copy(alpha = 0.18f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = NileCyan,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = "المصادقة البيومترية (BiometricPrompt API)",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            color = Color.White
+                        )
+                        Text(
+                            text = capability.statusMessageAr,
+                            fontSize = 10.sp,
+                            color = if (capability.canAuthenticate) NileSuccess else NileGold
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (capability.canAuthenticate) NileSuccess.copy(alpha = 0.2f) else NileGold.copy(alpha = 0.2f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = if (capability.canAuthenticate) "ACTIVE" else "STANDBY",
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Black,
+                        color = if (capability.canAuthenticate) NileSuccess else NileGold
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            Text(
+                text = "دمج كامل مع واجهة Android BiometricPrompt الرسمية (بصمة الإصبع وبصمة الوجه)، مع إمكانية استخدام رمز الجهاز (PIN/Pattern) كطبقة إضافية.",
+                fontSize = 10.sp,
+                color = Color.White.copy(alpha = 0.7f),
+                lineHeight = 15.sp
+            )
+
+            if (feedbackMessage != null) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Surface(
+                    shape = RoundedCornerShape(8.dp),
+                    color = NileCyan.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NileCyan.copy(alpha = 0.3f)),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(
+                        text = feedbackMessage,
+                        fontSize = 11.sp,
+                        color = NileCyan,
+                        modifier = Modifier.padding(8.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action Buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = onTestPrompt,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("test_biometric_prompt_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NileCyan,
+                        contentColor = Color.Black
+                    )
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Fingerprint,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "اختبار البصمة", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+
+                Button(
+                    onClick = onLockNow,
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(38.dp)
+                        .testTag("lock_wallet_now_button"),
+                    shape = RoundedCornerShape(10.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = NileDarkSurface,
+                        contentColor = NileGold
+                    ),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NileGold.copy(alpha = 0.5f))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = null,
+                        modifier = Modifier.size(14.dp),
+                        tint = NileGold
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(text = "قفل المحفظة الآن", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Sub-Toggles
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0x15FFFFFF), RoundedCornerShape(10.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                // Toggle 1: Lock on app launch
+                BiometricSubToggleRow(
+                    title = "قفل المحفظة عند فتح التطبيق",
+                    subtitle = "طلب بصمة الإصبع أو الوجه فور تشغيل البرنامج",
+                    isChecked = isLockOnLaunch,
+                    onToggle = onToggleLockOnLaunch
+                )
+
+                // Toggle 2: Biometric for NFC
+                BiometricSubToggleRow(
+                    title = "المصادقة قبل دفع NFC اللاتلامسي",
+                    subtitle = "تأكيد بصمة الإصبع أو Face ID لإتمام الدفع",
+                    isChecked = isBiometricForNfc,
+                    onToggle = onToggleBiometricForNfc
+                )
+
+                // Toggle 3: Biometric to unmask card details
+                BiometricSubToggleRow(
+                    title = "المصادقة لكشف أرقام البطاقة و CVV",
+                    subtitle = "حظر إظهار الأرقام الحساسة إلا بعد تأكيد الهوية",
+                    isChecked = isBiometricForCard,
+                    onToggle = onToggleBiometricForCard
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun BiometricSubToggleRow(
+    title: String,
+    subtitle: String,
+    isChecked: Boolean,
+    onToggle: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+            Text(text = subtitle, fontSize = 9.sp, color = Color.White.copy(alpha = 0.6f))
+        }
+        Switch(
+            checked = isChecked,
+            onCheckedChange = onToggle,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = NileCyan,
+                checkedTrackColor = NileCyan.copy(alpha = 0.4f),
+                uncheckedThumbColor = Color.Gray,
+                uncheckedTrackColor = Color.DarkGray
+            ),
+            modifier = Modifier.size(42.dp, 26.dp)
+        )
     }
 }
 

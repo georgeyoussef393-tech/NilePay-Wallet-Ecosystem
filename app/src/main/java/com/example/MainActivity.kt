@@ -2,7 +2,6 @@ package com.example
 
 import android.content.Intent
 import android.os.Bundle
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -10,17 +9,21 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.fragment.app.FragmentActivity
 import com.example.cards.CardRepository
 import com.example.nfc.NfcScanManager
 import com.example.nfc.NfcService
 import com.example.security.AccessControlManager
+import com.example.security.BiometricAuthManager
 import com.example.storage.CloudSyncManager
 import com.example.storage.NilePayStorageManager
+import com.example.ui.components.BiometricLockScreen
 import com.example.ui.screens.AdminDashboardScreen
 import com.example.ui.screens.EgyptianWalletsScreen
 import com.example.ui.screens.HomeScreen
@@ -35,7 +38,7 @@ enum class Screen {
     ADMIN_DASHBOARD
 }
 
-class MainActivity : ComponentActivity() {
+class MainActivity : FragmentActivity() {
 
     private lateinit var nfcService: NfcService
 
@@ -48,6 +51,7 @@ class MainActivity : ComponentActivity() {
         CardRepository.loadFromStorageOrSeed()
         EgyptianWalletEngine.loadFromStorageOrSeed()
         AccessControlManager.loadFromStorageOrSeed()
+        BiometricAuthManager.init(this)
 
         nfcService = NfcService.getInstance(this)
         enableEdgeToEdge()
@@ -85,41 +89,50 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun NilePayApp() {
     var currentScreen by remember { mutableStateOf(Screen.HOME) }
+    val isWalletLocked by BiometricAuthManager.isWalletLocked.collectAsState()
 
-    Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-        androidx.compose.foundation.layout.Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
-            when (currentScreen) {
-                Screen.HOME -> {
-                    HomeScreen(
-                        onNavigateToNfc = { currentScreen = Screen.NFC_PAYMENT },
-                        onNavigateToWallets = { currentScreen = Screen.EGYPTIAN_WALLETS },
-                        onNavigateToAdmin = { currentScreen = Screen.ADMIN_DASHBOARD }
-                    )
-                }
+    if (isWalletLocked) {
+        BiometricLockScreen(
+            onUnlocked = {
+                // Wallet is unlocked
+            }
+        )
+    } else {
+        Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+            ) {
+                when (currentScreen) {
+                    Screen.HOME -> {
+                        HomeScreen(
+                            onNavigateToNfc = { currentScreen = Screen.NFC_PAYMENT },
+                            onNavigateToWallets = { currentScreen = Screen.EGYPTIAN_WALLETS },
+                            onNavigateToAdmin = { currentScreen = Screen.ADMIN_DASHBOARD }
+                        )
+                    }
 
-                Screen.NFC_PAYMENT -> {
-                    BackHandler { currentScreen = Screen.HOME }
-                    NfcPaymentScreen(
-                        onNavigateBack = { currentScreen = Screen.HOME }
-                    )
-                }
+                    Screen.NFC_PAYMENT -> {
+                        BackHandler { currentScreen = Screen.HOME }
+                        NfcPaymentScreen(
+                            onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
 
-                Screen.EGYPTIAN_WALLETS -> {
-                    BackHandler { currentScreen = Screen.HOME }
-                    EgyptianWalletsScreen(
-                        onNavigateBack = { currentScreen = Screen.HOME }
-                    )
-                }
+                    Screen.EGYPTIAN_WALLETS -> {
+                        BackHandler { currentScreen = Screen.HOME }
+                        EgyptianWalletsScreen(
+                            onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
 
-                Screen.ADMIN_DASHBOARD -> {
-                    BackHandler { currentScreen = Screen.HOME }
-                    AdminDashboardScreen(
-                        onNavigateBack = { currentScreen = Screen.HOME }
-                    )
+                    Screen.ADMIN_DASHBOARD -> {
+                        BackHandler { currentScreen = Screen.HOME }
+                        AdminDashboardScreen(
+                            onNavigateBack = { currentScreen = Screen.HOME }
+                        )
+                    }
                 }
             }
         }

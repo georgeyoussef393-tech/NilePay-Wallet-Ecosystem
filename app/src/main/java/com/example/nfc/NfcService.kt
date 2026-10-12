@@ -222,6 +222,41 @@ class NfcService(private val context: Context) {
     }
 
     /**
+     * Opens Android System NFC Settings directly for the user to turn on NFC.
+     */
+    fun openNfcSettings(context: Context) {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_NFC_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            try {
+                val intent = Intent(android.provider.Settings.ACTION_WIRELESS_SETTINGS).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+            } catch (ex: Exception) {
+                Log.e(TAG, "Failed to open NFC or wireless settings", ex)
+            }
+        }
+    }
+
+    /**
+     * Opens Android Contactless Payment / Tap & Pay Settings for the user to select NilePay as default app.
+     */
+    fun openNfcPaymentSettings(context: Context) {
+        try {
+            val intent = Intent(android.provider.Settings.ACTION_NFC_PAYMENT_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            openNfcSettings(context)
+        }
+    }
+
+    /**
      * Inspects an incoming Intent (e.g. from onNewIntent) to extract a detected NFC Tag.
      */
     fun extractTagFromIntent(intent: Intent?): Tag? {

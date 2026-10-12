@@ -386,4 +386,10 @@ object EgyptianWalletEngine {
         }
         persistAndSync()
     }
+
+    fun clearAllWalletsAndTransactions() {
+        _wallets.value = emptyList()
+        _recentTransactions.value = emptyList()
+        persistAndSync()
+    }
 }

@@ -266,13 +266,27 @@ fun EgyptianWalletsScreen(
                     color = NileCyan,
                     letterSpacing = 1.sp
                 )
-                Button(
-                    onClick = { showLinkWalletDialog = true },
-                    colors = ButtonDefaults.buttonColors(containerColor = NileCyan, contentColor = Color.Black),
-                    shape = RoundedCornerShape(8.dp),
-                    modifier = Modifier.testTag("open_link_wallet_button")
-                ) {
-                    Text(text = "+ Link Wallet", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (wallets.isNotEmpty()) {
+                        TextButton(
+                            onClick = {
+                                EgyptianWalletEngine.clearAllWalletsAndTransactions()
+                                bannerMessage = Pair(true, "تم مسح وتفريغ كافّة المحافظ والمعاملات الافتراضية.")
+                            },
+                            modifier = Modifier.testTag("clear_all_wallets_button")
+                        ) {
+                            Text(text = "مسح المحافظ", color = NileError, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.width(4.dp))
+                    }
+                    Button(
+                        onClick = { showLinkWalletDialog = true },
+                        colors = ButtonDefaults.buttonColors(containerColor = NileCyan, contentColor = Color.Black),
+                        shape = RoundedCornerShape(8.dp),
+                        modifier = Modifier.testTag("open_link_wallet_button")
+                    ) {
+                        Text(text = "+ Link Wallet", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
             Spacer(modifier = Modifier.height(10.dp))

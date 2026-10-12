@@ -137,7 +137,8 @@ object CardRepository {
         merchantCategory: String,
         terminalId: String,
         amountEGP: Double,
-        location: String = "Cairo, Egypt"
+        location: String = "Cairo, Egypt",
+        isBiometricVerified: Boolean = true
     ): NfcPaymentResult {
         // Dynamic Access Control Guard: Check if NFC contactless payment is permitted for current testing tenant
         val permCheck = AccessControlManager.checkPermission(
@@ -178,7 +179,7 @@ object CardRepository {
             amountEGP = amountEGP,
             dailyCurrentSpent = card.currentSpentTodayEGP,
             dailyLimit = card.dailySpendLimitEGP,
-            isBiometricVerified = true
+            isBiometricVerified = isBiometricVerified
         )
         if (secCheck is SecurityValidationResult.Blocked) {
             val blockedTx = TransactionRecord(
@@ -197,6 +198,9 @@ object CardRepository {
             )
             EgyptianWalletEngine.recordTransaction(blockedTx)
             return NfcPaymentResult.Blocked(secCheck.reason)
+        }
+        if (secCheck is SecurityValidationResult.RequiresBiometrics) {
+            return NfcPaymentResult.Failure(secCheck.message)
         }
 
         // Anti-Relay Attack timing verification (EMV latency check)
@@ -256,6 +260,12 @@ object CardRepository {
         EgyptianWalletEngine.recordTransaction(tx)
 
         return NfcPaymentResult.Success(tx, cryptogram.applicationCryptogramHex)
+    }
+
+    fun clearAllCards() {
+        _cards.value = emptyList()
+        _defaultNfcCard.value = null
+        persistAndSync()
     }
 }
 

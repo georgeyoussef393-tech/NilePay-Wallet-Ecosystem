@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AdminPanelSettings
 import androidx.compose.material.icons.filled.Business
 import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Badge
@@ -43,6 +44,7 @@ import com.example.model.CompanyTesterProfile
 import com.example.model.FeaturePermission
 import com.example.model.TransactionRecord
 import com.example.model.TransactionStatus
+import com.example.security.BiometricAuthManager
 import com.example.ui.theme.NileCyan
 import com.example.ui.theme.NileError
 import com.example.ui.theme.NileGold
@@ -58,7 +60,8 @@ fun NileTopHeader(
     onOpenAdmin: () -> Unit,
     onSwitchCompany: () -> Unit,
     onOpenCloudSync: () -> Unit = {},
-    onOpenSecurityCenter: () -> Unit = {}
+    onOpenSecurityCenter: () -> Unit = {},
+    onLockWallet: () -> Unit = { BiometricAuthManager.lockWallet() }
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -127,11 +130,38 @@ fun NileTopHeader(
                     }
                 }
 
-                // Action buttons: Security Vault + Cloud Sync + Admin
+                // Action buttons: Quick Lock + Security Vault + Cloud Sync + Admin
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
+                    // Quick Biometric Lock Button
+                    Surface(
+                        onClick = onLockWallet,
+                        shape = RoundedCornerShape(20.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant,
+                        modifier = Modifier.testTag("quick_lock_wallet_button")
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 7.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "قفل بالبصمة",
+                                tint = NileGold,
+                                modifier = Modifier.size(14.dp)
+                            )
+                            Spacer(modifier = Modifier.width(3.dp))
+                            Text(
+                                text = "قفل",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NileGold
+                            )
+                        }
+                    }
+
                     // Security Center Shield Button
                     Surface(
                         onClick = onOpenSecurityCenter,

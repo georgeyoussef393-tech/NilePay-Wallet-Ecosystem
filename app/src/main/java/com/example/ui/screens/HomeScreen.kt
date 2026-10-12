@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import android.widget.Toast
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Atm
 import androidx.compose.material.icons.filled.CloudDone
 import androidx.compose.material.icons.filled.Contactless
 import androidx.compose.material.icons.filled.CreditCard
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material.icons.filled.PhoneAndroid
@@ -56,6 +58,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -67,8 +70,13 @@ import com.example.model.CardType
 import com.example.model.FeaturePermission
 import com.example.model.TransactionRecord
 import com.example.nfc.EmvScannedCard
+import com.example.nfc.NfcHardwareStatus
 import com.example.nfc.NfcScanManager
+import com.example.nfc.NfcService
 import com.example.security.AccessControlManager
+import com.example.storage.CloudSyncManager
+import com.example.storage.NilePayStorageManager
+import com.example.wallets.EgyptianWalletEngine
 import com.example.ui.components.CloudSyncDialog
 import com.example.ui.components.NfcCardScanDialog
 import com.example.ui.components.NileTopHeader
@@ -83,7 +91,6 @@ import com.example.ui.theme.NileGold
 import com.example.ui.theme.NilePrimary
 import com.example.ui.theme.NileSuccess
 import com.example.ui.theme.VodafoneRed
-import com.example.wallets.EgyptianWalletEngine
 import java.util.Locale
 
 @Composable
@@ -109,7 +116,12 @@ fun HomeScreen(
     var showNfcScanDialog by remember { mutableStateOf(false) }
     var showCloudSyncDialog by remember { mutableStateOf(false) }
     var showSecurityVaultDialog by remember { mutableStateOf(false) }
+    var showClearDataDialog by remember { mutableStateOf(false) }
     var selectedTxDetail by remember { mutableStateOf<TransactionRecord?>(null) }
+
+    val context = LocalContext.current
+    val nfcService = remember { NfcService.getInstance(context) }
+    val nfcHardwareStatus by nfcService.hardwareStatus.collectAsState()
 
     // Total aggregated balance across cards & Egyptian mobile wallets
     val totalWalletBalance = wallets.filter { it.isLinked }.sumOf { it.balanceEGP }
@@ -128,6 +140,58 @@ fun HomeScreen(
                 onOpenCloudSync = { showCloudSyncDialog = true },
                 onOpenSecurityCenter = { showSecurityVaultDialog = true }
             )
+        }
+
+        // NFC Disabled Prompt Banner
+        if (nfcHardwareStatus == NfcHardwareStatus.DISABLED) {
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .clickable { nfcService.openNfcSettings(context) }
+                        .testTag("nfc_disabled_warning_banner"),
+                    shape = RoundedCornerShape(16.dp),
+                    color = NileError.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NileError)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Nfc,
+                            contentDescription = null,
+                            tint = NileError,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⚠️ تقنية NFC غير مفعلة على هذا الهاتف!",
+                                fontWeight = FontWeight.Bold,
+                                color = NileError,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "الدفع اللاتلامسي يتطلب تفعيل NFC. اضغط هنا لتفعيلها فوراً في إعدادات الهاتف.",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 11.sp,
+                                lineHeight = 15.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Button(
+                            onClick = { nfcService.openNfcSettings(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = NileError, contentColor = Color.White),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تفعيل NFC", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
         }
 
         // Hero Balance Card
@@ -402,7 +466,7 @@ fun HomeScreen(
                             Column {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
-                                        text = "أمان البطاقات و NFC مفعل",
+                                        text = "أمان البطاقات والبصمة البيومترية مفعل",
                                         fontSize = 13.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = NileCyan
@@ -415,7 +479,7 @@ fun HomeScreen(
                                             .padding(horizontal = 4.dp, vertical = 1.dp)
                                     ) {
                                         Text(
-                                            text = "Anti-Relay & AES-256",
+                                            text = "Biometric & NFC Shield",
                                             fontSize = 9.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = NileGold
@@ -423,7 +487,7 @@ fun HomeScreen(
                                     }
                                 }
                                 Text(
-                                    text = "تشفير التلامس • حظر استنساخ الكروت • فحص زمني ذكي لمنع الاختراق",
+                                    text = "بصمة BiometricPrompt • درع NFC ضد الترحيل • تشفير AES-256 للأجهزة",
                                     fontSize = 11.sp,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -483,6 +547,16 @@ fun HomeScreen(
                             Icon(imageVector = Icons.Default.Add, contentDescription = null, tint = NileCyan, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(text = "Manual", color = NileCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        if (cards.isNotEmpty() || wallets.isNotEmpty()) {
+                            TextButton(
+                                onClick = { showClearDataDialog = true },
+                                modifier = Modifier.testTag("wipe_seed_cards_button")
+                            ) {
+                                Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null, tint = NileError, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text(text = "مسح الكل", color = NileError, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
                 }
@@ -875,6 +949,47 @@ fun HomeScreen(
     if (showSecurityVaultDialog) {
         SecurityVaultDialog(
             onDismiss = { showSecurityVaultDialog = false }
+        )
+    }
+
+    // Clear Default Seed Data Dialog
+    if (showClearDataDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDataDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null, tint = NileError)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("مسح كافّة البيانات الافتراضية")
+                }
+            },
+            text = {
+                Text(
+                    text = "هل أنت متأكد من رغبتك في مسح وتفريغ جميع البطاقات والمحافظ والمعاملات الافتراضية العيّنية؟\n\nبعد المسح ستصبح المحفظة فارغة تماماً لتتمكن من إضافة كروتك ومحافظك المباشرة.",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        NilePayStorageManager.clearAllStorage()
+                        CardRepository.clearAllCards()
+                        EgyptianWalletEngine.clearAllWalletsAndTransactions()
+                        CloudSyncManager.syncNowToCloud(silent = true)
+                        showClearDataDialog = false
+                        Toast.makeText(context, "تم مسح كافة البيانات الافتراضية بنجاح! المحفظة فارغة الآن.", Toast.LENGTH_LONG).show()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = NileError, contentColor = Color.White)
+                ) {
+                    Text("مسح وحذف الكل", fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDataDialog = false }) {
+                    Text("إلغاء")
+                }
+            }
         )
     }
 }

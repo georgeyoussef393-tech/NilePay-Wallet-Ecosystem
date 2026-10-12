@@ -59,19 +59,24 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.fragment.app.FragmentActivity
 import com.example.cards.CardRepository
 import com.example.cards.NfcPaymentResult
 import com.example.model.CardToken
 import com.example.model.CardType
 import com.example.model.FeaturePermission
 import com.example.nfc.NfcApduMonitor
+import com.example.nfc.NfcHardwareStatus
 import com.example.nfc.NfcScanManager
+import com.example.nfc.NfcService
 import com.example.security.AccessControlManager
+import com.example.security.BiometricAuthManager
 import com.example.ui.components.NfcCardScanDialog
 import com.example.ui.components.SecurityVaultDialog
 import com.example.ui.theme.MeezaGreen
@@ -108,6 +113,13 @@ fun NfcPaymentScreen(
     var showApduDetails by remember { mutableStateOf(true) }
     var showScanCardDialog by remember { mutableStateOf(false) }
     var showSecurityVaultDialog by remember { mutableStateOf(false) }
+    var showInternalSimulator by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+    val activity = context as? FragmentActivity
+    val nfcService = remember { NfcService.getInstance(context) }
+    val nfcHardwareStatus by nfcService.hardwareStatus.collectAsState()
+    val isBiometricForNfc by BiometricAuthManager.isBiometricForNfcRequired.collectAsState()
 
     val hasNfcPermission = activeCompany.isActive && activeCompany.grantedPermissions.contains(FeaturePermission.NFC_CONTACTLESS_PAY)
 
@@ -194,6 +206,57 @@ fun NfcPaymentScreen(
             Spacer(modifier = Modifier.height(16.dp))
         }
 
+        // NFC Disabled Warning Banner
+        if (nfcHardwareStatus == NfcHardwareStatus.DISABLED) {
+            item {
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 14.dp)
+                        .clickable { nfcService.openNfcSettings(context) }
+                        .testTag("nfc_screen_disabled_warning_banner"),
+                    shape = RoundedCornerShape(16.dp),
+                    color = NileError.copy(alpha = 0.15f),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, NileError)
+                ) {
+                    Row(
+                        modifier = Modifier.padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Nfc,
+                            contentDescription = null,
+                            tint = NileError,
+                            modifier = Modifier.size(28.dp)
+                        )
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "⚠️ تقنية NFC غير مفعلة على الهاتف!",
+                                fontWeight = FontWeight.Bold,
+                                color = NileError,
+                                fontSize = 13.sp
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "اضغط هنا لتفعيل NFC في إعدادات الهاتف لتتمكن من استخدام الدفع اللاتلامسي.",
+                                color = Color.White.copy(alpha = 0.85f),
+                                fontSize = 11.sp
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Button(
+                            onClick = { nfcService.openNfcSettings(context) },
+                            colors = ButtonDefaults.buttonColors(containerColor = NileError, contentColor = Color.White),
+                            shape = RoundedCornerShape(10.dp)
+                        ) {
+                            Text("تفعيل", fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
         // Access Policy Notice if NFC is blocked for current testing tenant
         if (!hasNfcPermission) {
             item {
@@ -235,15 +298,134 @@ fun NfcPaymentScreen(
             }
         }
 
+        // Real POS Terminal Ready Notice
+        item {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 16.dp)
+                    .testTag("real_pos_terminal_ready_card"),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = NileCyan.copy(alpha = 0.12f)
+                ),
+                border = androidx.compose.foundation.BorderStroke(1.5.dp, NileCyan)
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.Contactless,
+                                contentDescription = null,
+                                tint = NileCyan,
+                                modifier = Modifier.size(26.dp)
+                            )
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Column {
+                                Text(
+                                    text = "جاهز للدفع على أي ماكينة POS في مصر",
+                                    fontWeight = FontWeight.Black,
+                                    color = Color.White,
+                                    fontSize = 14.sp
+                                )
+                                Text(
+                                    text = "خدمة HCE مجهزة لشبكات Meeza و Visa و Mastercard",
+                                    fontSize = 11.sp,
+                                    color = NileCyan
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "خطوات الدفع المباشر في أي محلات أو سوبرماركت بمصر:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(text = "1️⃣ اختر البطاقة التي تريد الدفع بها من القائمة أدناه.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "2️⃣ تأكد من تفعيل الـ NFC على الهاتف وضبط NilePay كتطبيق الدفع الافتراضي.", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "3️⃣ قرّب ظهر هاتفك مباشرة من ماكينة الـ POS (فوري، البنك الأهلي، بنك مصر، CIB، أمان...).", fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = "4️⃣ ستتلقى الماكينة بيانات الكارت المشفرة عبر HCE وتتم معالجة الدفع فوراً!", fontSize = 11.sp, color = NileCyan, fontWeight = FontWeight.SemiBold)
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Button(
+                        onClick = { nfcService.openNfcPaymentSettings(context) },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("nfc_set_default_payment_app_button"),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = NileCyan, contentColor = Color.Black)
+                    ) {
+                        Icon(imageVector = Icons.Default.Nfc, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "ضبط NilePay كتطبيق الدفع الافتراضي للهاتف", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         // Active Card Presentation
         item {
-            Text(
-                text = "SELECT PAYMENT CARD",
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Bold,
-                color = NileCyan,
-                letterSpacing = 1.sp
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "اختر كارت الدفع اللاتلامسي",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = NileCyan,
+                    letterSpacing = 0.5.sp
+                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (cards.isNotEmpty()) {
+                        Surface(
+                            onClick = { CardRepository.clearAllCards() },
+                            shape = RoundedCornerShape(8.dp),
+                            color = NileError.copy(alpha = 0.2f),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, NileError.copy(alpha = 0.5f)),
+                            modifier = Modifier.testTag("nfc_clear_default_cards_button")
+                        ) {
+                            Text(
+                                text = "مسح الكروت الافتراضية",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = NileError,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                    }
+                    Surface(
+                        onClick = {
+                            NfcScanManager.startScanning()
+                            showScanCardDialog = true
+                        },
+                        shape = RoundedCornerShape(8.dp),
+                        color = NileCyan.copy(alpha = 0.2f),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, NileCyan.copy(alpha = 0.5f)),
+                        modifier = Modifier.testTag("nfc_add_custom_card_button")
+                    ) {
+                        Text(
+                            text = "+ إضافة كارت",
+                            fontSize = 10.sp,
+                            color = NileCyan,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
             Spacer(modifier = Modifier.height(8.dp))
 
             if (cards.isEmpty()) {
@@ -420,7 +602,7 @@ fun NfcPaymentScreen(
             Spacer(modifier = Modifier.height(20.dp))
         }
 
-        // Interactive POS Terminal Simulator
+        // Interactive POS Terminal Simulator (Optional Internal Testing Tool)
         item {
             Card(
                 modifier = Modifier
@@ -428,13 +610,15 @@ fun NfcPaymentScreen(
                     .testTag("pos_terminal_simulator_card"),
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f)
+                    containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                 ),
-                border = androidx.compose.foundation.BorderStroke(1.dp, NileCyan.copy(alpha = 0.3f))
+                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33FFFFFF))
             ) {
-                Column(modifier = Modifier.padding(18.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
                     Row(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showInternalSimulator = !showInternalSimulator },
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -446,12 +630,19 @@ fun NfcPaymentScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "POS Terminal Simulator",
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 15.sp,
-                                color = MaterialTheme.colorScheme.onSurface
-                            )
+                            Column {
+                                Text(
+                                    text = "أداة اختبار المعاملات (اخشياري بدون ماكينة)",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    text = if (showInternalSimulator) "اضغط لإخفاء المحاكي الداخلي" else "اضغط لإظهار محاكي المعاملات الداخلي للتجربة",
+                                    fontSize = 10.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         }
                         Box(
                             modifier = Modifier
@@ -460,7 +651,7 @@ fun NfcPaymentScreen(
                                 .padding(horizontal = 8.dp, vertical = 3.dp)
                         ) {
                             Text(
-                                text = "CBE POS",
+                                text = if (showInternalSimulator) "إخفاء ▲" else "إظهار ▼",
                                 fontSize = 10.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = NileCyan
@@ -468,7 +659,8 @@ fun NfcPaymentScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(14.dp))
+                    AnimatedVisibility(visible = showInternalSimulator) {
+                        Column(modifier = Modifier.padding(top = 14.dp)) {
 
                     // Merchant selector chips
                     Text(
@@ -575,16 +767,37 @@ fun NfcPaymentScreen(
                         onClick = {
                             if (selectedCard != null) {
                                 val amt = txAmountInput.toDoubleOrNull() ?: 150.0
-                                isSimulatingTap = true
-                                val result = CardRepository.processNfcTapPayment(
-                                    cardId = selectedCard.id,
-                                    merchantName = selectedMerchant.first,
-                                    merchantCategory = "Retail Merchant",
-                                    terminalId = selectedMerchant.second,
-                                    amountEGP = amt
-                                )
-                                lastPaymentResult = result
-                                isSimulatingTap = false
+
+                                fun executePayment(biometricVerified: Boolean) {
+                                    isSimulatingTap = true
+                                    val result = CardRepository.processNfcTapPayment(
+                                        cardId = selectedCard.id,
+                                        merchantName = selectedMerchant.first,
+                                        merchantCategory = "Retail Merchant",
+                                        terminalId = selectedMerchant.second,
+                                        amountEGP = amt,
+                                        isBiometricVerified = biometricVerified
+                                    )
+                                    lastPaymentResult = result
+                                    isSimulatingTap = false
+                                }
+
+                                if (isBiometricForNfc && activity != null) {
+                                    BiometricAuthManager.authenticate(
+                                        activity = activity,
+                                        title = "تفويض الدفع اللاتلامسي NFC",
+                                        subtitle = "المبلغ: $amt ج.م • ${selectedMerchant.first}",
+                                        description = "استخدم بصمة الإصبع أو Face ID لتفويض العملية البنكية",
+                                        onSuccess = {
+                                            executePayment(true)
+                                        },
+                                        onError = { err ->
+                                            lastPaymentResult = NfcPaymentResult.Failure("تعذر إتمام الدفع: فشل المصادقة البيومترية ($err)")
+                                        }
+                                    )
+                                } else {
+                                    executePayment(true)
+                                }
                             }
                         },
                         modifier = Modifier
@@ -618,6 +831,8 @@ fun NfcPaymentScreen(
                                 fontSize = 13.sp,
                                 letterSpacing = 0.5.sp
                             )
+                        }
+                    }
                         }
                     }
                 }

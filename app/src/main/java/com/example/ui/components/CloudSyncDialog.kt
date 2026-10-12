@@ -526,33 +526,60 @@ fun CloudSyncDialog(
         )
     }
 
-    // Sub-dialog: Reset Confirmation
+    // Sub-dialog: Clear Data Options
     if (showResetConfirmDialog) {
         AlertDialog(
             onDismissRequest = { showResetConfirmDialog = false },
-            title = { Text("تأكيد إعادة الضبط الافتراضي") },
+            title = { Text("إدارة ومسح البيانات") },
             text = {
-                Text(
-                    text = "هل تريد استعادة البيانات الافتراضية التجريبية (بطاقات CIB، البنك الأهلي، بنك مصر ومحافظ فودافون كاش وإنستاباي)؟",
-                    fontSize = 13.sp
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        NilePayStorageManager.clearAllStorage()
-                        CardRepository.loadFromStorageOrSeed()
-                        EgyptianWalletEngine.loadFromStorageOrSeed()
-                        AccessControlManager.loadFromStorageOrSeed()
-                        CloudSyncManager.syncNowToCloud(silent = false)
-                        showResetConfirmDialog = false
-                        Toast.makeText(context, "تمت إعادة ضبط البيانات الافتراضية بنجاح", Toast.LENGTH_SHORT).show()
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = NileError)
-                ) {
-                    Text("إعادة الضبط")
+                Column {
+                    Text(
+                        text = "اختر الإجراء المطلوب للتعامل مع البيانات الافتراضية في المحفظة:",
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Button(
+                        onClick = {
+                            NilePayStorageManager.clearAllStorage()
+                            CardRepository.clearAllCards()
+                            EgyptianWalletEngine.clearAllWalletsAndTransactions()
+                            CloudSyncManager.syncNowToCloud(silent = true)
+                            showResetConfirmDialog = false
+                            Toast.makeText(context, "تم مسح وتفريغ جميع البيانات بنجاح! المحفظة فارغة الآن.", Toast.LENGTH_LONG).show()
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = NileError),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("🗑️ مسح وتفريغ كافّة البيانات الآن", fontWeight = FontWeight.Bold, fontSize = 12.sp)
+                    }
+
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            NilePayStorageManager.clearAllStorage()
+                            CardRepository.loadFromStorageOrSeed()
+                            EgyptianWalletEngine.loadFromStorageOrSeed()
+                            AccessControlManager.loadFromStorageOrSeed()
+                            CloudSyncManager.syncNowToCloud(silent = true)
+                            showResetConfirmDialog = false
+                            Toast.makeText(context, "تمت إعادة ضبط البيانات الافتراضية التجريبية بنجاح", Toast.LENGTH_SHORT).show()
+                        },
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = NileCyan),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("🔄 استعادة البيانات التجريبية الافتراضية", fontWeight = FontWeight.SemiBold, fontSize = 12.sp)
+                    }
                 }
             },
+            confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showResetConfirmDialog = false }) {
                     Text("إلغاء")
